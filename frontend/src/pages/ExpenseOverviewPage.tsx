@@ -189,11 +189,16 @@ export default function ExpenseOverviewPage() {
               {RANGES.map((r) => (
                 <button key={r.key}
                   onClick={() => {
-                    if (r.key === 'custom' && range !== 'custom') {
-                      if (!customStart || !customEnd) {
+                    if (r.key === 'custom') {
+                      // 激活自定义模式：未填过日期时预填"今年至今"并立即按此查询
+                      if (range !== 'custom') {
                         const now = new Date();
-                        setCustomStart(`${now.getFullYear()}-01-01`);
-                        setCustomEnd(now.toISOString().slice(0, 10));
+                        const start = customStart || `${now.getFullYear()}-01-01`;
+                        const end = customEnd || now.toISOString().slice(0, 10);
+                        setCustomStart(start);
+                        setCustomEnd(end);
+                        setAppliedCustom({ start, end });
+                        setRange('custom');
                       }
                       return;
                     }

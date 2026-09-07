@@ -82,9 +82,8 @@ export default function VehiclesPage() {
     navigate('/consumptions');
   };
 
-  const quickNav = (id: string, path: string) => {
+  const quickNav = (id: string) => {
     localStorage.setItem('selectedVehicleId', id);
-    navigate(path);
   };
 
   return (
@@ -166,10 +165,10 @@ export default function VehiclesPage() {
                 </div>
               </div>
               <div className="mt-2 pt-2 border-t border-gray-50 flex items-center gap-3">
-                <Link to="/consumptions" className="text-xs text-blue-600 min-h-[44px] flex items-center" onClick={() => quickNav(v.id, '/consumptions')}>
+                <Link to="/consumptions/list?add=1" className="text-xs text-blue-600 min-h-[44px] flex items-center" onClick={() => quickNav(v.id)}>
                   记能耗 →
                 </Link>
-                <Link to="/expenses" className="text-xs text-blue-600 min-h-[44px] flex items-center" onClick={() => quickNav(v.id, '/expenses')}>
+                <Link to="/expenses/list?add=1" className="text-xs text-blue-600 min-h-[44px] flex items-center" onClick={() => quickNav(v.id)}>
                   记费用 →
                 </Link>
               </div>
