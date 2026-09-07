@@ -82,6 +82,11 @@ export default function VehiclesPage() {
     navigate('/consumptions');
   };
 
+  const quickNav = (id: string, path: string) => {
+    localStorage.setItem('selectedVehicleId', id);
+    navigate(path);
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -161,18 +166,11 @@ export default function VehiclesPage() {
                 </div>
               </div>
               <div className="mt-2 pt-2 border-t border-gray-50 flex items-center gap-3">
-                <select
-                  value={v.type}
-                  onChange={(e) => handleEditTypeOnly(v, e.target.value)}
-                  className="text-xs border rounded px-2 py-1"
-                  aria-label="切换车辆类型"
-                >
-                  <option value="fuel">燃油车</option>
-                  <option value="electric">纯电车</option>
-                  <option value="hybrid">插电混动</option>
-                </select>
-                <Link to="/consumptions" className="text-xs text-blue-600 min-h-[44px] flex items-center" onClick={() => selectVehicle(v.id)}>
+                <Link to="/consumptions" className="text-xs text-blue-600 min-h-[44px] flex items-center" onClick={() => quickNav(v.id, '/consumptions')}>
                   记能耗 →
+                </Link>
+                <Link to="/expenses" className="text-xs text-blue-600 min-h-[44px] flex items-center" onClick={() => quickNav(v.id, '/expenses')}>
+                  记费用 →
                 </Link>
               </div>
             </div>
