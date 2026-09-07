@@ -29,3 +29,5 @@ coverage/
 
 # Local deploy config with real resource IDs (never commit)
 worker/wrangler.local.toml
+
+worker/wrangler.test.toml

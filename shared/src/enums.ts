@@ -16,7 +16,7 @@ export type ChargingType = 'dc' | 'ac';
 /**
  * Period enumeration for periodic expenses
  */
-export type Period = 'daily' | 'monthly';
+export type Period = 'daily' | 'monthly' | 'yearly';
 
 /**
  * Sync status for local records

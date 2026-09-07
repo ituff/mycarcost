@@ -87,7 +87,8 @@ cd worker   && npx tsc --noEmit
 - 费用类型：名称 1–20 唯一；颜色 #RRGGBB；分摊月数 1–60 默认 12（固定车位费、保险和交通规费为 12 个月分摊）。
 - 费用：金额 0.01–999,999,999.99；备注 ≤200，历史备注自动补全 10 条。
 - 收入：date/amount/typeName(≤20)/note；计入费用报表 totalIncome。
-- 周期费用：daily/monthly + 起止日期；⚠️ 目前仅存储展示，报表未计入（已知缺口）。
+- 周期费用：daily/monthly/yearly + 起止日期；系统自动记账——Cron Trigger（每天北京时间 00:05，`[triggers] crons`）运行 `worker/src/periodic.ts`，把到期各期生成为费用记录（note 标注"周期费用自动生成"），`lastGeneratedDate` 防重、首次登记不回溯历史。例：毛豆3 车载娱乐 9.99 元/每月23日 已登记。
+- 保养记录：`maintenance_records` 表 + `routes/maintenance.ts`；字段：时间/里程/金额(允许0)/项目标签(JSON数组，预设20项+自定义)/备注；"记录为费用"勾选时联动创建"维修保养"费用记录（金额≥0.01 才生成），编辑同步、删除级联删除关联费用。
 - 同步：恢复网络 30s 内自动同步；失败 60s 重试最多 3 次；LWW + conflict_archive 存档。
 - 图片识别：JPEG/PNG ≤10MB，OpenAI 兼容 API，30s 超时，模型必填。
 - 导航：底部 车辆/能耗/＋/费用/设置；"+" 弹出记能耗/记费用（?add=1 自动开表单）。

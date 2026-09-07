@@ -95,6 +95,16 @@ export const api = {
   deletePeriodicExpense: (id: string) =>
     request<any>(`/periodic-expenses/${id}`, { method: 'DELETE' }),
 
+  // Maintenance records
+  getMaintenanceRecords: (vehicleId: string) =>
+    request<{ maintenanceRecords: any[] }>(`/vehicles/${vehicleId}/maintenance`),
+  createMaintenance: (vehicleId: string, data: { recordTime: string; amount: number; mileage: number; items: string[]; note?: string; recordAsExpense?: boolean }) =>
+    request<any>(`/vehicles/${vehicleId}/maintenance`, { method: 'POST', body: JSON.stringify(data) }),
+  updateMaintenance: (id: string, data: { recordTime: string; amount: number; mileage: number; items: string[]; note?: string; recordAsExpense?: boolean }) =>
+    request<any>(`/maintenance/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteMaintenance: (id: string) =>
+    request<any>(`/maintenance/${id}`, { method: 'DELETE' }),
+
   // Incomes
   getIncomes: (vehicleId: string, params?: { page?: number; pageSize?: number }) => {
     const qs = new URLSearchParams();

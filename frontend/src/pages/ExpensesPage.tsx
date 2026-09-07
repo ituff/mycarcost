@@ -15,7 +15,7 @@ export default function ExpensesPage() {
   const [showForm, setShowForm] = useState(false);
   const [showPeriodicForm, setShowPeriodicForm] = useState(false);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
-  const [tab, setTab] = useState<'expenses' | 'periodic' | 'types' | 'incomes'>('expenses');
+  const [tab, setTab] = useState<'expenses' | 'periodic' | 'maintenance' | 'types' | 'incomes'>('expenses');
 
   // Form state
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -32,6 +32,26 @@ export default function ExpensesPage() {
   const [pPeriod, setPPeriod] = useState('monthly');
   const [pStartDate, setPStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [pEndDate, setPEndDate] = useState('');
+
+  // Maintenance form state
+  const [maintenanceRecords, setMaintenanceRecords] = useState<any[]>([]);
+  const [showMaintenanceForm, setShowMaintenanceForm] = useState(false);
+  const [editMaintenance, setEditMaintenance] = useState<any>(null);
+  const [mRecordTime, setMRecordTime] = useState(new Date().toISOString().slice(0, 16));
+  const [mAmount, setMAmount] = useState('');
+  const [mMileage, setMMileage] = useState('');
+  const [mItems, setMItems] = useState<string[]>([]);
+  const [mCustomItems, setMCustomItems] = useState('');
+  const [mNote, setMNote] = useState('');
+  const [mRecordAsExpense, setMRecordAsExpense] = useState(true);
+
+  /** 小熊油耗预设保养项目 */
+  const MAINTENANCE_ITEMS = [
+    '机油', '机油滤清器', '汽油滤清器', '空气滤清器', '空调滤芯', '空调除菌',
+    '火花塞', '刹车油', '助力转向油', '变速箱油', '冷却液', '刹车片',
+    '轮胎换位', '动平衡', '四轮定位', '换轮胎', '燃油系统清洗',
+    '润滑系统清洗', '三元催化', '节气门',
+  ];
 
   // Income form state
   const [iDate, setIDate] = useState(new Date().toISOString().slice(0, 10));
@@ -62,16 +82,18 @@ export default function ExpensesPage() {
     if (!vehicleId) return;
     setLoading(true);
     try {
-      const [expData, periodicData, notesData, incomeData] = await Promise.all([
+      const [expData, periodicData, notesData, incomeData, maintenanceData] = await Promise.all([
         api.getExpenses(vehicleId),
         api.getPeriodicExpenses(vehicleId),
         api.getExpenseNotes(vehicleId),
         api.getIncomes(vehicleId),
+        api.getMaintenanceRecords(vehicleId),
       ]);
       setExpenses(expData.expenses);
       setPeriodicExpenses(periodicData.periodicExpenses);
       setNotes(notesData.notes);
       setIncomes(incomeData.incomes);
+      setMaintenanceRecords(maintenanceData.maintenanceRecords);
     } catch { /* ignore */ }
     finally { setLoading(false); }
   }, [vehicleId]);
@@ -128,6 +150,78 @@ export default function ExpensesPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const toggleMaintenanceItem = (item: string) => {
+    setMItems((prev) => (prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]));
+  };
+
+  const openMaintenanceForm = (record?: any) => {
+    setEditMaintenance(record || null);
+    if (record) {
+      setMRecordTime(record.recordTime.slice(0, 16));
+      setMAmount(String(record.amount));
+      setMMileage(String(record.mileage));
+      setMItems(record.items || []);
+      setMCustomItems('');
+      setMNote(record.note || '');
+      setMRecordAsExpense(!!record.expenseId);
+    } else {
+      setMRecordTime(new Date().toISOString().slice(0, 16));
+      setMAmount('');
+      setMMileage('');
+      setMItems([]);
+      setMCustomItems('');
+      setMNote('');
+      setMRecordAsExpense(true);
+    }
+    setShowMaintenanceForm(true);
+  };
+
+  const allMaintenanceItems = () => {
+    const custom = mCustomItems.split(/[\s,，、]+/).map((s) => s.trim()).filter(Boolean);
+    return [...mItems, ...custom.filter((c) => !mItems.includes(c))];
+  };
+
+  const handleMaintenanceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vehicleId) return;
+    setError('');
+    const items = allMaintenanceItems();
+    if (items.length === 0) {
+      setError('请至少选择或输入一个保养项目');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const payload = {
+        recordTime: mRecordTime,
+        amount: parseFloat(mAmount) || 0,
+        mileage: parseFloat(mMileage),
+        items,
+        note: mNote.trim() || undefined,
+        recordAsExpense: mRecordAsExpense,
+      };
+      if (editMaintenance) {
+        await api.updateMaintenance(editMaintenance.id, payload);
+      } else {
+        await api.createMaintenance(vehicleId, payload);
+      }
+      setShowMaintenanceForm(false);
+      loadData();
+    } catch (err: any) {
+      setError(err?.fields ? Object.values(err.fields)[0] as string : err.error || '保存失败');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteMaintenance = async (record: any) => {
+    const msg = record.expenseId
+      ? '确定删除此保养记录？关联的费用记录将一并删除。'
+      : '确定删除此保养记录？';
+    if (!confirm(msg)) return;
+    try { await api.deleteMaintenance(record.id); loadData(); } catch { }
   };
 
   const handleIncomeSubmit = async (e: React.FormEvent) => {
@@ -212,7 +306,7 @@ export default function ExpensesPage() {
 
       {/* Tabs */}
       <div className="flex border-b mb-4 overflow-x-auto">
-        {[{ key: 'expenses', label: '费用记录' }, { key: 'periodic', label: '周期费用' }, { key: 'incomes', label: '收入' }, { key: 'types', label: '费用类型' }].map((t) => (
+        {[{ key: 'expenses', label: '费用记录' }, { key: 'periodic', label: '周期费用' }, { key: 'maintenance', label: '保养记录' }, { key: 'incomes', label: '收入' }, { key: 'types', label: '费用类型' }].map((t) => (
           <button key={t.key} onClick={() => setTab(t.key as any)}
             className={`px-4 py-2 min-h-[44px] text-sm whitespace-nowrap ${tab === t.key ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}>
             {t.label}
@@ -307,9 +401,11 @@ export default function ExpensesPage() {
                   <select value={pPeriod} onChange={(e) => setPPeriod(e.target.value)} className="w-full border rounded-lg px-3 py-2 min-h-[44px]">
                     <option value="daily">每日</option>
                     <option value="monthly">每月</option>
+                    <option value="yearly">每年</option>
                   </select>
                 </div>
               </div>
+              <p className="text-xs text-gray-400">登记后系统会在每个周期自动生成费用记录，无需手动记账。开始日期决定扣费日（每月按日、每年按月-日）。</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">开始日期</label>
@@ -336,6 +432,112 @@ export default function ExpensesPage() {
                     <p className="text-xs text-gray-400">{pe.startDate} ~ {pe.endDate} · {pe.expenseTypeName}</p>
                   </div>
                   <button onClick={() => handleDeletePeriodic(pe.id)} className="text-red-500 min-w-[44px] min-h-[44px] flex items-center justify-center">🗑️</button>
+                </div>
+              ))}
+            </div>
+          }
+        </>
+      )}
+
+      {/* Maintenance Tab */}
+      {tab === 'maintenance' && (
+        <>
+          {vehicleId && (
+            <button onClick={() => openMaintenanceForm()} className="w-full bg-blue-600 text-white py-2 rounded-lg mb-4 min-h-[44px]">
+              + 添加保养记录
+            </button>
+          )}
+          {showMaintenanceForm && (
+            <form onSubmit={handleMaintenanceSubmit} className="bg-white rounded-lg p-4 mb-4 shadow-sm space-y-3">
+              <h3 className="font-semibold">{editMaintenance ? '编辑保养记录' : '添加保养记录'}</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">保养时间</label>
+                  <input type="datetime-local" value={mRecordTime} onChange={(e) => setMRecordTime(e.target.value)} className="w-full border rounded-lg px-3 py-2 min-h-[44px]" required />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">支出（元，0 表示免费）</label>
+                  <input type="number" step="0.01" min="0" value={mAmount} onChange={(e) => setMAmount(e.target.value)} className="w-full border rounded-lg px-3 py-2 min-h-[44px]" required />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">当前里程 (km)</label>
+                <input type="number" step="0.1" min="0" value={mMileage} onChange={(e) => setMMileage(e.target.value)} className="w-full border rounded-lg px-3 py-2 min-h-[44px]" required />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">保养项目（点选）</label>
+                <div className="flex flex-wrap gap-2">
+                  {MAINTENANCE_ITEMS.map((item) => {
+                    const on = mItems.includes(item);
+                    return (
+                      <button key={item} type="button" onClick={() => toggleMaintenanceItem(item)}
+                        className={`px-3 py-1.5 rounded-full text-sm min-h-[36px] border ${on ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300'}`}>
+                        {item}
+                      </button>
+                    );
+                  })}
+                </div>
+                <textarea
+                  value={mCustomItems}
+                  onChange={(e) => setMCustomItems(e.target.value)}
+                  maxLength={1000}
+                  rows={2}
+                  className="w-full border rounded-lg px-3 py-2 mt-2 text-sm"
+                  placeholder="自定义保养项目，空格分隔"
+                />
+              </div>
+              <label className="flex items-center gap-2 min-h-[44px]">
+                <input type="checkbox" checked={mRecordAsExpense} onChange={(e) => setMRecordAsExpense(e.target.checked)} />
+                <span className="text-sm">记录为费用（计入"维修保养"费用统计）</span>
+              </label>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">备注</label>
+                <textarea value={mNote} onChange={(e) => setMNote(e.target.value)} maxLength={1000} rows={2}
+                  className="w-full border rounded-lg px-3 py-2" />
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" disabled={submitting} className="bg-blue-600 text-white px-4 py-2 rounded-lg min-h-[44px] flex-1">
+                  {submitting ? '保存中...' : '保存'}
+                </button>
+                <button type="button" onClick={() => setShowMaintenanceForm(false)} className="border px-4 py-2 rounded-lg min-h-[44px]">取消</button>
+              </div>
+            </form>
+          )}
+          {!vehicleId ? <div className="text-center py-8 text-gray-400">请先选择车辆</div>
+            : loading ? <div className="text-center py-8 text-gray-400">加载中...</div>
+            : maintenanceRecords.length === 0 ? <div className="text-center py-8 text-gray-400">暂无保养记录</div>
+            : <div className="space-y-3">
+              {maintenanceRecords.map((r) => (
+                <div key={r.id} className="bg-white rounded-lg p-4 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium">
+                        {r.recordTime?.slice(0, 16).replace('T', ' ')} · {Number(r.mileage).toFixed(0)} km
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {(r.items || []).map((item: string) => (
+                          <span key={item} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{item}</span>
+                        ))}
+                      </div>
+                      {r.note && <p className="text-xs text-gray-400 mt-1">{r.note}</p>}
+                      {r.expenseId && <p className="text-xs text-green-600 mt-1">已计入费用记录</p>}
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-red-500">¥{Number(r.amount).toFixed(2)}</p>
+                      <div className="flex gap-1 mt-1">
+                        <button
+                          onClick={() => openMaintenanceForm(r)}
+                          className="min-w-[44px] min-h-[44px] flex items-center justify-center text-blue-600"
+                          aria-label="编辑"
+                        >✏️</button>
+                        <button
+                          onClick={() => handleDeleteMaintenance(r)}
+                          className="min-w-[44px] min-h-[44px] flex items-center justify-center text-red-500"
+                          aria-label="删除"
+                        >🗑️</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

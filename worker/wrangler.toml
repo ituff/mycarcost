@@ -2,6 +2,10 @@ name = "mycarcost-worker"
 main = "src/index.ts"
 compatibility_date = "2024-09-25"
 
+# Cron Trigger: daily 00:05 Beijing (16:05 UTC) — generate due periodic expenses
+[triggers]
+crons = ["5 16 * * *"]
+
 # Static assets: frontend SPA build output (Workers Static Assets)
 [assets]
 directory = "../frontend/dist"

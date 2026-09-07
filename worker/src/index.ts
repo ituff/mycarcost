@@ -7,11 +7,13 @@ import consumptions from './routes/consumptions';
 import expenses from './routes/expenses';
 import periodicExpenses from './routes/periodicExpenses';
 import incomes from './routes/incomes';
+import maintenance from './routes/maintenance';
 import reports from './routes/reports';
 import imageRecognition from './routes/imageRecognition';
 import settings from './routes/settings';
 import sync from './routes/sync';
 import auth, { requireAuth } from './auth';
+import { generateDuePeriodicExpenses } from './periodic';
 
 export interface Env {
   DB: D1Database;
@@ -73,6 +75,11 @@ app.route('/api/periodic-expenses', periodicExpenses);
 app.route('/api/vehicles', incomes);
 app.route('/api/incomes', incomes);
 
+// Maintenance routes: GET/POST at /api/vehicles/:vehicleId/maintenance
+// PUT/DELETE at /api/maintenance/:id
+app.route('/api/vehicles', maintenance);
+app.route('/api/maintenance', maintenance);
+
 // Report routes: GET at /api/vehicles/:vehicleId/reports/*
 app.route('/api/vehicles', reports);
 
@@ -90,4 +97,11 @@ app.get('*', async (c) => {
   return c.env.ASSETS.fetch(c.req.raw);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // Cron Trigger (see wrangler.toml [triggers]): auto-generate due
+  // periodic expense records once a day.
+  scheduled: async (event: ScheduledController, env: Env, ctx: ExecutionContext) => {
+    ctx.waitUntil(generateDuePeriodicExpenses(env.DB));
+  },
+};

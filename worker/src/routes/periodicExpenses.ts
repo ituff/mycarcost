@@ -4,6 +4,8 @@ import type { Period } from '@mycarcost/shared';
 
 const periodicExpenses = new Hono<{ Bindings: Env }>();
 
+const VALID_PERIODS: Period[] = ['daily', 'monthly', 'yearly'];
+
 function validatePeriodicExpenseBody(body: any): Record<string, string> {
   const errors: Record<string, string> = {};
 
@@ -17,8 +19,8 @@ function validatePeriodicExpenseBody(body: any): Record<string, string> {
     errors['amount'] = '金额必须在0.01至999999999.99之间';
   }
 
-  if (!body.period || !['daily', 'monthly'].includes(body.period)) {
-    errors['period'] = '周期必须为每日或每月';
+  if (!body.period || !VALID_PERIODS.includes(body.period)) {
+    errors['period'] = '周期必须为每日、每月或每年';
   }
 
   if (!body.startDate || !/^\d{4}-\d{2}-\d{2}/.test(body.startDate)) {
@@ -99,8 +101,8 @@ periodicExpenses.post('/:vehicleId/periodic-expenses', async (c) => {
   try {
     await db
       .prepare(
-        `INSERT INTO periodic_expenses (id, vehicleId, expenseTypeId, amount, period, startDate, endDate, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO periodic_expenses (id, vehicleId, expenseTypeId, amount, period, startDate, endDate, lastGeneratedDate, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         id,
@@ -110,6 +112,8 @@ periodicExpenses.post('/:vehicleId/periodic-expenses', async (c) => {
         body.period as Period,
         body.startDate.slice(0, 10),
         body.endDate.slice(0, 10),
+        // 不回溯历史：从登记当天起由定时任务生成
+        todayStr(),
         now,
         now
       )
@@ -164,7 +168,7 @@ periodicExpenses.put('/:id', async (c) => {
   try {
     await db
       .prepare(
-        `UPDATE periodic_expenses SET expenseTypeId = ?, amount = ?, period = ?, startDate = ?, endDate = ?, updatedAt = ? WHERE id = ?`
+        `UPDATE periodic_expenses SET expenseTypeId = ?, amount = ?, period = ?, startDate = ?, endDate = ?, lastGeneratedDate = ?, updatedAt = ? WHERE id = ?`
       )
       .bind(
         body.expenseTypeId,
@@ -172,6 +176,8 @@ periodicExpenses.put('/:id', async (c) => {
         body.period as Period,
         body.startDate.slice(0, 10),
         body.endDate.slice(0, 10),
+        // 修改周期后从今天起按新规则生成
+        todayStr(),
         now,
         id
       )
@@ -203,5 +209,9 @@ periodicExpenses.delete('/:id', async (c) => {
     return c.json({ error: '删除周期费用失败' }, 500);
   }
 });
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export default periodicExpenses;
