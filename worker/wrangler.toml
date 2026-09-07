@@ -1,0 +1,25 @@
+name = "mycarcost-worker"
+main = "src/index.ts"
+compatibility_date = "2024-09-25"
+
+# Static assets: frontend SPA build output (Workers Static Assets)
+[assets]
+directory = "../frontend/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# D1 Database binding
+# Run `npx wrangler d1 create mycarcost-db` and paste the database_id here,
+# then `npx wrangler d1 migrations apply mycarcost-db --remote`.
+[[d1_databases]]
+binding = "DB"
+database_name = "mycarcost-db"
+database_id = "<your-d1-database-id>"
+migrations_dir = "migrations"
+
+# R2 Bucket binding (for temporary image storage)
+# Optional: image recognition works without it (skips the audit upload).
+# Create the bucket first: `npx wrangler r2 bucket create mycarcost-images`
+# [[r2_buckets]]
+# binding = "BUCKET"
+# bucket_name = "mycarcost-images"
