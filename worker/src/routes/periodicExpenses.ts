@@ -26,6 +26,12 @@ function validatePeriodicExpenseBody(body: any): Record<string, string> {
   if (!body.startDate || !/^\d{4}-\d{2}-\d{2}/.test(body.startDate)) {
     errors['startDate'] = '请选择开始日期';
   }
+
+  if (body.note !== undefined && body.note !== null && typeof body.note !== 'string') {
+    errors['note'] = '备注格式错误';
+  } else if (typeof body.note === 'string' && body.note.length > 200) {
+    errors['note'] = '备注不能超过200个字符';
+  }
   if (!body.endDate || !/^\d{4}-\d{2}-\d{2}/.test(body.endDate)) {
     errors['endDate'] = '请选择结束日期';
   } else if (body.startDate && body.endDate < body.startDate) {
@@ -101,8 +107,8 @@ periodicExpenses.post('/:vehicleId/periodic-expenses', async (c) => {
   try {
     await db
       .prepare(
-        `INSERT INTO periodic_expenses (id, vehicleId, expenseTypeId, amount, period, startDate, endDate, lastGeneratedDate, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO periodic_expenses (id, vehicleId, expenseTypeId, amount, period, startDate, endDate, note, lastGeneratedDate, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         id,
@@ -112,6 +118,7 @@ periodicExpenses.post('/:vehicleId/periodic-expenses', async (c) => {
         body.period as Period,
         body.startDate.slice(0, 10),
         body.endDate.slice(0, 10),
+        body.note?.trim() || null,
         // 不回溯历史：从登记当天起由定时任务生成
         todayStr(),
         now,
@@ -168,7 +175,7 @@ periodicExpenses.put('/:id', async (c) => {
   try {
     await db
       .prepare(
-        `UPDATE periodic_expenses SET expenseTypeId = ?, amount = ?, period = ?, startDate = ?, endDate = ?, lastGeneratedDate = ?, updatedAt = ? WHERE id = ?`
+        `UPDATE periodic_expenses SET expenseTypeId = ?, amount = ?, period = ?, startDate = ?, endDate = ?, note = ?, lastGeneratedDate = ?, updatedAt = ? WHERE id = ?`
       )
       .bind(
         body.expenseTypeId,
@@ -176,6 +183,7 @@ periodicExpenses.put('/:id', async (c) => {
         body.period as Period,
         body.startDate.slice(0, 10),
         body.endDate.slice(0, 10),
+        body.note?.trim() || null,
         // 修改周期后从今天起按新规则生成
         todayStr(),
         now,

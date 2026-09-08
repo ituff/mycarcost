@@ -32,6 +32,8 @@ export default function ExpensesPage() {
   const [pPeriod, setPPeriod] = useState('monthly');
   const [pStartDate, setPStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [pEndDate, setPEndDate] = useState('');
+  const [pNote, setPNote] = useState('');
+  const [editPeriodic, setEditPeriodic] = useState<any>(null);
 
   // Maintenance form state
   const [maintenanceRecords, setMaintenanceRecords] = useState<any[]>([]);
@@ -134,22 +136,50 @@ export default function ExpensesPage() {
     if (!vehicleId) return;
     setError('');
     setSubmitting(true);
+    const payload = {
+      expenseTypeId: pExpenseTypeId,
+      amount: parseFloat(pAmount),
+      period: pPeriod,
+      startDate: pStartDate,
+      endDate: pEndDate,
+      note: pNote.trim() || undefined,
+    };
     try {
-      await api.createPeriodicExpense(vehicleId, {
-        expenseTypeId: pExpenseTypeId,
-        amount: parseFloat(pAmount),
-        period: pPeriod,
-        startDate: pStartDate,
-        endDate: pEndDate,
-      });
+      if (editPeriodic) {
+        await api.updatePeriodicExpense(editPeriodic.id, payload);
+      } else {
+        await api.createPeriodicExpense(vehicleId, payload);
+      }
       setShowPeriodicForm(false);
+      setEditPeriodic(null);
       setPAmount('');
+      setPNote('');
       loadData();
     } catch (err: any) {
       setError(err.error || '保存失败');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const openPeriodicForm = (pe?: any) => {
+    setEditPeriodic(pe || null);
+    if (pe) {
+      setPExpenseTypeId(pe.expenseTypeId);
+      setPAmount(String(pe.amount));
+      setPPeriod(pe.period);
+      setPStartDate(pe.startDate);
+      setPEndDate(pe.endDate);
+      setPNote(pe.note || '');
+    } else {
+      setPExpenseTypeId('');
+      setPAmount('');
+      setPPeriod('monthly');
+      setPStartDate(new Date().toISOString().slice(0, 10));
+      setPEndDate('');
+      setPNote('');
+    }
+    setShowPeriodicForm(true);
   };
 
   const toggleMaintenanceItem = (item: string) => {
@@ -378,12 +408,13 @@ export default function ExpensesPage() {
       {tab === 'periodic' && (
         <>
           {vehicleId && (
-            <button onClick={() => setShowPeriodicForm(true)} className="w-full bg-blue-600 text-white py-2 rounded-lg mb-4 min-h-[44px]">
+            <button onClick={() => openPeriodicForm()} className="w-full bg-blue-600 text-white py-2 rounded-lg mb-4 min-h-[44px]">
               + 添加周期费用
             </button>
           )}
           {showPeriodicForm && (
             <form onSubmit={handlePeriodicSubmit} className="bg-white rounded-lg p-4 mb-4 shadow-sm space-y-3">
+              <h3 className="font-semibold">{editPeriodic ? '编辑周期费用' : '添加周期费用'}</h3>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">费用类型</label>
                 <select value={pExpenseTypeId} onChange={(e) => setPExpenseTypeId(e.target.value)} className="w-full border rounded-lg px-3 py-2 min-h-[44px]" required>
@@ -405,7 +436,6 @@ export default function ExpensesPage() {
                   </select>
                 </div>
               </div>
-              <p className="text-xs text-gray-400">登记后系统会在每个周期自动生成费用记录，无需手动记账。开始日期决定扣费日（每月按日、每年按月-日）。</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">开始日期</label>
@@ -416,9 +446,14 @@ export default function ExpensesPage() {
                   <input type="date" value={pEndDate} onChange={(e) => setPEndDate(e.target.value)} className="w-full border rounded-lg px-3 py-2 min-h-[44px]" required />
                 </div>
               </div>
+              <p className="text-xs text-gray-400">登记后系统会在每个周期自动生成费用记录，无需手动记账。开始日期决定扣费日（每月按日、每年按月-日）。</p>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">备注（会作为自动生成费用记录的备注）</label>
+                <input type="text" value={pNote} onChange={(e) => setPNote(e.target.value)} maxLength={200} className="w-full border rounded-lg px-3 py-2 min-h-[44px]" placeholder="如 特斯拉娱乐服务包" />
+              </div>
               <div className="flex gap-2">
                 <button type="submit" disabled={submitting} className="bg-blue-600 text-white px-4 py-2 rounded-lg min-h-[44px] flex-1">保存</button>
-                <button type="button" onClick={() => setShowPeriodicForm(false)} className="border px-4 py-2 rounded-lg min-h-[44px]">取消</button>
+                <button type="button" onClick={() => { setShowPeriodicForm(false); setEditPeriodic(null); }} className="border px-4 py-2 rounded-lg min-h-[44px]">取消</button>
               </div>
             </form>
           )}
@@ -428,10 +463,13 @@ export default function ExpensesPage() {
               {periodicExpenses.map((pe) => (
                 <div key={pe.id} className="bg-white rounded-lg p-3 shadow-sm flex justify-between items-center">
                   <div>
-                    <p className="font-medium">¥{pe.amount.toFixed(2)} / {pe.period === 'daily' ? '天' : '月'}</p>
-                    <p className="text-xs text-gray-400">{pe.startDate} ~ {pe.endDate} · {pe.expenseTypeName}</p>
+                    <p className="font-medium">¥{pe.amount.toFixed(2)} / {pe.period === 'daily' ? '天' : pe.period === 'yearly' ? '年' : '月'}</p>
+                    <p className="text-xs text-gray-400">{pe.startDate} ~ {pe.endDate} · {pe.expenseTypeName}{pe.note ? ` · ${pe.note}` : ''}</p>
                   </div>
-                  <button onClick={() => handleDeletePeriodic(pe.id)} className="text-red-500 min-w-[44px] min-h-[44px] flex items-center justify-center">🗑️</button>
+                  <div className="flex gap-1">
+                    <button onClick={() => openPeriodicForm(pe)} className="min-w-[44px] min-h-[44px] flex items-center justify-center text-blue-600" aria-label="编辑">✏️</button>
+                    <button onClick={() => handleDeletePeriodic(pe.id)} className="text-red-500 min-w-[44px] min-h-[44px] flex items-center justify-center">🗑️</button>
+                  </div>
                 </div>
               ))}
             </div>

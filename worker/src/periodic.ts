@@ -17,6 +17,7 @@ interface PeriodicRow {
   period: 'daily' | 'monthly' | 'yearly';
   startDate: string;
   endDate: string;
+  note: string | null;
   lastGeneratedDate: string | null;
 }
 
@@ -87,6 +88,7 @@ export async function generateDuePeriodicExpenses(db: Env['DB'], today = new Dat
       const fromDate = pe.lastGeneratedDate ?? previousDay(today);
 
       const due = occurrencesBetween(pe, fromDate, effectiveEnd);
+      const generatedNote = pe.note?.trim() || `周期费用自动生成（${pe.period === 'daily' ? '每日' : pe.period === 'monthly' ? '每月' : '每年'}）`;
       for (const date of due) {
         await db
           .prepare(
@@ -99,7 +101,7 @@ export async function generateDuePeriodicExpenses(db: Env['DB'], today = new Dat
             pe.expenseTypeId,
             date,
             pe.amount,
-            `周期费用自动生成（${pe.period === 'daily' ? '每日' : pe.period === 'monthly' ? '每月' : '每年'}）`,
+            generatedNote,
             new Date().toISOString(),
             new Date().toISOString()
           )
